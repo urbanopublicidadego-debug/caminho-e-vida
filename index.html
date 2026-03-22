@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caminho & Vida - Oficial</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        :root { 
+            --bg: #0f172a; --card: #1e293b; --wire: #38bdf8; 
+            --admin: #10b981; --gold: #fbbf24; --text: #f1f5f9; 
+            --box-info: #2d3748;
+            --t-quick: 0.2s; --t-slow: 0.8s;
+        }
+
+        body { 
+            background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; 
+            margin: 0; padding-bottom: 90px; -webkit-user-select: none; user-select: none; 
+            overflow-x: hidden; 
+        }
+
+        /* ANIMAÇÕES GERAIS */
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes logoPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 5px var(--wire)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 15px var(--admin)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 5px var(--wire)); }
+        }
+
+        @keyframes bgZoomOut {
+            from { transform: scale(1.1); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        textarea, input, select { 
+            -webkit-user-select: text; user-select: text; outline: none; width: 100%; 
+            background: rgba(15, 23, 42, 0.8); border: 1px solid #475569; color: #fff; 
+            padding: 15px; border-radius: 12px; margin-top: 10px; box-sizing: border-box;
+            transition: var(--t-quick);
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--wire);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        .container { max-width: 600px; margin: auto; padding: 20px; display: none; }
+        .container.active { 
+            display: block; 
+            animation: slideUpFade var(--t-slow) ease-out;
+        }
+
+        .tab-bar { background: #000; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid #334155; display: flex; }
+        .tab { flex: 1; padding: 18px; text-align: center; cursor: pointer; font-size: 0.7rem; font-weight: bold; opacity: 0.4; transition: 0.3s; }
+        .tab.active { opacity: 1; border-bottom: 3px solid var(--wire); color: var(--wire); text-shadow: 0 0 5px var(--wire); }
+
+        .card { 
+            background: var(--card); padding: 25px; border-radius: 20px; 
+            border-left: 6px solid var(--wire); margin-bottom: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;
+            transition: var(--t-quick);
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0,0,0,0.6); }
+
+        .box-info { background: var(--box-info); border-radius: 12px; padding: 15px; margin: 15px 0; border-left: 4px solid var(--gold); }
+        .box-oracao { background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--wire); border-radius: 15px; padding: 20px; margin: 20px 0; text-align: center; font-style: italic; color: #a3e635; text-shadow: 0 0 2px #a3e635;}
+
+        .btn { 
+            width: 100%; padding: 16px; border-radius: 35px; border: none; 
+            font-weight: bold; cursor: pointer; margin-top: 10px; 
+            transition: var(--t-quick); text-transform: uppercase;
+            position: relative; overflow: hidden;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:hover { filter: brightness(1.1); box-shadow: 0 0 15px rgba(56, 189, 248, 0.6); }
+
+        .btn-wire { background: var(--wire); color: #000; }
+        .btn-admin { background: var(--admin); color: #fff; }
+
+        .versiculo { color: var(--wire); font-style: italic; display: block; margin: 12px 0; border-left: 2px solid var(--wire); padding-left: 10px; font-size: 0.95rem; text-shadow: 0 0 2px var(--wire); }
+        
+        .voice-player { background: rgba(15, 23, 42, 0.6); border-radius: 50px; padding: 8px 15px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; border: 1px solid #334155; }
+        .btn-audio { background: var(--wire); border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #000; font-size: 1.3rem; transition: var(--t-quick); }
+        .btn-audio:hover { transform: rotate(15deg) scale(1.1); }
+        
+        .audio-wave { flex: 1; height: 4px; background: #334155; border-radius: 2px; position: relative; overflow: hidden; }
+        .audio-progress { position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: var(--wire); box-shadow: 0 0 10px var(--wire); }
+
+        /* ESTILO SPLASH SCREEN REFORMULADA */
+        #splash-screen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); 
+            z-index: 10000; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            transition: opacity var(--t-slow) ease, visibility var(--t-slow);
+        }
+        
+        #splash-logo {
+            animation: logoPulse 2s infinite ease-in-out;
+            margin-bottom: 20px;
+        }
+
+        /* ESTILO INPUTS RADIO (BATISMO) ESTILIZADOS */
+        .radio-group label {
+            display: flex; align-items: center; gap: 12px; cursor: pointer; 
+            padding: 12px; border-radius: 8px; transition: var(--t-quick);
+        }
+        .radio-group label:hover { background: rgba(56, 189, 248, 0.1); }
+        
+        .radio-group input[type="radio"] {
+            appearance: none; -webkit-appearance: none;
+            width: 20px; height: 20px; border: 2px solid #475569;
+            border-radius: 50%; background: transparent; position: relative;
+            transition: var(--t-quick); margin: 0;
+        }
+        
+        .radio-group input[type="radio"]:checked {
+            border-color: var(--wire);
+            box-shadow: 0 0 8px var(--wire);
+        }
+        
+        .radio-group input[type="radio"]:checked::after {
+            content: ''; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 10px; height: 10px;
+            background: var(--wire); border-radius: 50%;
+            box-shadow: 0 0 5px var(--wire);
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="splash-screen">
+        <div id="splash-logo">
+            <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8" />
+                        <stop offset="100%" stop-color="#10b981" />
+                    </linearGradient>
+                </defs>
+                <path d="M30 60C30 71.0457 38.9543 80 50 80C61.0457 80 70 71.0457 70 60C70 48.9543 61.0457 40 50 40C38.9543 40 30 31.0457 30 20C30 8.9543 38.9543 0 50 0C61.0457 0 70 8.9543 70 20" stroke="url(#logoGrad)" stroke-width="6" stroke-linecap="round"/>
+                <path d="M70 40C70 28.9543 61.0457 20 50 20C38.9543 20 30 28.9543 30 40C30 51.0457 38.9543 60 50 60C61.0457 60 70 51.0457 70 40Z" stroke="url(#logoGrad)" stroke-width="6" stroke-linecap="round"/>
+                <rect x="47" y="25" width="6" height="40" rx="3" fill="white"/>
+                <rect x="35" y="37" width="30" height="6" rx="3" fill="white"/>
+            </svg>
+        </div>
+        <div style="font-size:2rem; font-weight:bold; color:var(--text); text-shadow: 0 0 10px rgba(255,255,255,0.3);">Caminho <span style="color:var(--wire)">&</span> Vida</div>
+        <div style="font-size:0.8rem; color:var(--text); opacity:0.6; margin-top:10px;">Versão Oficial - By: UP</div>
+    </div>
+
+    <div id="welcome-screen" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; padding:20px; animation: bgZoomOut var(--t-slow) ease-out;">
+        <div class="card" style="max-width:350px; border:none; text-align:center; transform: none; box-shadow: 0 20px 50px rgba(0,0,0,0.7);">
+            <h2 style="color:var(--wire); margin-bottom: 5px;">Seja Bem-vindo!</h2>
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 20px;">Para iniciar sua jornada de fé, informe seus dados básicos.</p>
+            <input type="text" id="reg-nome" placeholder="Seu Nome Completo">
+            <input type="tel" id="reg-whats" placeholder="WhatsApp (DDD + Número)" maxlength="15">
+            <button class="btn btn-admin" style="margin-top: 25px;" onclick="fazerLogin()">INICIAR JORNADA 🚀</button>
+        </div>
+    </div>
+
+    <div class="tab-bar" id="main-nav" style="display:none;">
+        <div id="t-disc" class="tab active" onclick="switchTab('view-discipulo')">📖 JORNADA</div>
+        <div id="t-adm" class="tab" onclick="acessoMestre()">⚙️ DISCIPULADOR</div>
+    </div>
+
+    <div id="view-discipulo" class="container"><div id="lesson-container"></div></div>
+
+    <div id="view-admin" class="container">
+        <h2 style="color: var(--admin)">Gestão & Relatórios</h2>
+        
+        <div id="dashboard-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <div class="card" style="margin:0; padding:15px; border-left-color: var(--wire); text-align:center;">
+                <small>ALUNOS</small><h2 id="stat-alunos" style="margin:5px 0;">0</h2>
+            </div>
+            <div class="card" style="margin:0; padding:15px; border-left-color: var(--admin); text-align:center;">
+                <small>DECISÕES</small><h2 id="stat-decisoes" style="margin:5px 0;">0</h2>
+            </div>
+            <div class="card" style="margin:0; padding:15px; border-left-color: var(--gold); text-align:center; grid-column: span 2;">
+                <small>SITUAÇÃO BATISMO</small>
+                <div id="stat-batismo" style="font-size: 0.8rem; margin-top:10px; text-align:left; display: flex; justify-content: space-around;">Carregando...</div>
+            </div>
+        </div>
+
+        <div id="lista-licoes-edit" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 15px;"></div>
+        
+        <div class="card" style="border-left-color: var(--admin)">
+            <input type="hidden" id="edit-id-doc" value="">
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="new-ordem" placeholder="Nº">
+                <select id="new-tipo">
+                    <option value="manual">📄 MANUAL</option>
+                    <option value="batismo">🌊 BATISMO</option>
+                    <option value="salvacao">🔥 SALVAÇÃO</option>
+                    <option value="texto">📖 PERGUNTA</option>
+                </select>
+            </div>
+            <input type="text" id="new-tit" placeholder="Título da Lição">
+            <input type="text" id="new-ver" placeholder="Versículo Principal (ex: João 3:16)">
+            <textarea id="new-txt" rows="4" placeholder="Explicação ou Pergunta da lição..."></textarea>
+            <input type="text" id="new-ver2" placeholder="Versículo de Apoio (Opcional)">
+            <textarea id="new-exp2" rows="3" placeholder="Explicação Extra (Opcional)"></textarea>
+            <button id="btn-save-main" class="btn btn-admin" style="margin-top: 20px;" onclick="salvarLicaoCloud()">SALVAR ALTERAÇÕES</button>
+            <button id="btn-cancel" class="btn" style="display:none; background:#ef4444;" onclick="limparForm()">CANCELAR EDIÇÃO</button>
+        </div>
+
+      <div><h3 style="margin-top:30px;">Respostas dos Alunos</h3>
+        <div id="lista-respostas-admin"></div>
+
+<div style="margin-top: 30px; padding: 20px; border-top: 1px solid #334155; text-align: center;">
+    <button class="btn btn-admin" style="max-width: 400px; margin: 0 auto;" onclick="enviarTodosFeedbacks()">
+        ENVIAR TODOS OS FEEDBACKS 🚀
+    </button>
+</div>
+<div style="margin-top: 20px; padding: 0 10px;">
+    <button class="btn" style="background: #ef4444; color: #fff;" onclick="sairApp()">
+        SAIR / RESETAR MEU USUÁRIO 🚪
+    </button>
+</div>
+
+    <script>
+function sairApp() {
+    if (confirm("Deseja realmente sair e trocar de usuário? Isso resetará os dados de acesso deste aparelho.")) {
+        // Limpa os dados salvos no navegador
+        localStorage.removeItem("CV_NOME");
+        localStorage.setItem("CV_WHATS", ""); // Limpa o whats também
+        
+        // Recarrega a página para voltar à Splash Screen e Login
+        window.location.reload();
+    }
+}
+async function enviarTodosFeedbacks() {
+    const cards = document.querySelectorAll('#lista-respostas-admin .card');
+    let totalSalvo = 0;
+
+    for (let card of cards) {
+        const txtArea = card.querySelector('textarea');
+        const feedback = txtArea.value.trim();
+        
+        // Só envia se você escreveu algo no campo
+        if (feedback) {
+            // Pegamos o ID que o Firebase gerou para essa resposta específica
+            // Se você seguiu a lógica de ID anterior, o ID do doc está acessível.
+            // Aqui usamos um atributo customizado ou extraímos do contexto.
+            const alunoInfo = card.querySelector('b').innerText;
+            const licaoInfo = card.querySelector('p').innerText; // Ou lógica similar
+            
+            // Para garantir precisão, o ideal é que o ID do doc esteja no elemento
+            const docId = card.getAttribute('data-id'); 
+
+            if (docId) {
+                await db.collection('respostas').doc(docId).update({
+                    correcao: feedback,
+                    dataFeedback: new Date()
+                });
+                totalSalvo++;
+            }
+        }
+    }
+    alert(totalSalvo + " Feedbacks enviados com sucesso!");
+}
+
+// Ajuste na função que lista as respostas para incluir o ID do documento
+// (Modifique a parte do snap.forEach no seu acessoMestre)
+/* Exemplo de como deve ficar a linha do HTML dentro do loop:
+   htmlRespostas += `<div class="card" data-id="${doc.id}" ...> ... </div>`;
+*/
+
+
+        // CONFIGURAÇÃO FIREBASE (Mantenha as suas credenciais originais aqui)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3hMRVyvXoU0XbVbcGsOtVHbba1PxzAsA",
+            authDomain: "caminho-e-vida.firebaseapp.com",
+            projectId: "caminho-e-vida",
+            storageBucket: "caminho-e-vida.firebasestorage.app",
+            messagingSenderId: "1017611196160",
+            appId: "1:1017611196160:web:1dc492e794fb1e14b245e5"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let licoes = [], passoAtual = 0, alunoNome = localStorage.getItem("CV_NOME");
+
+        // --- MÁSCARA WHATSAPP ---
+        document.getElementById('reg-whats').addEventListener('input', e => {
+            let x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
+            e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+        });
+
+        // --- VOZ INTELIGENTE ---
+        const synth = window.speechSynthesis;
+        let isSpeaking = false;
+
+        function alternarVoz() {
+            if (!isSpeaking) {
+                synth.cancel();
+                const l = licoes[passoAtual];
+                let t = `${l.tit}. ${l.ver}. ${l.txt}. ${l.ver2 || ''}. ${l.explica2 || ''}`;
+                if(l.tipo === 'salvacao') t += " Oração de Entrega: Senhor Jesus, eu entendo que Tu és o descendente prometido. Eu me arrependo dos meus pecados e te recebo como meu Salvador. Amém!";
+                
+                let limpo = t.replace(/<[^>]*>/g, ' ').replace(/(\d+):(\d+)/g, ' capítulo $1 versículo $2 ');
+                const ut = new SpeechSynthesisUtterance(limpo);
+                ut.lang = 'pt-BR';
+                ut.onboundary = (e) => { document.getElementById('audio-bar').style.width = (e.charIndex / limpo.length * 100) + '%'; };
+                ut.onend = () => { stopVoz(); };
+                document.getElementById('btn-play-icon').innerText = '⏸';
+                synth.speak(ut);
+                isSpeaking = true;
+            } else {
+                if (synth.paused) { synth.resume(); document.getElementById('btn-play-icon').innerText = '⏸'; }
+                else { synth.pause(); document.getElementById('btn-play-icon').innerText = '▶️'; }
+            }
+        }
+
+        function stopVoz() { synth.cancel(); isSpeaking = false; if(document.getElementById('btn-play-icon')) document.getElementById('btn-play-icon').innerText = '▶️'; if(document.getElementById('audio-bar')) document.getElementById('audio-bar').style.width = '0%'; }
+
+        // --- CARREGAR DADOS ---
+        function carregarLicoes() {
+            db.collection("config_licoes").orderBy("ordem", "asc").onSnapshot(snap => {
+                let bruta = []; snap.forEach(doc => bruta.push({ idDoc: doc.id, ...doc.data() }));
+                licoes = bruta.sort((a,b) => {
+                    const pesos = { manual: 1, batismo: 2, salvacao: 3, texto: 4 };
+                    return a.ordem === b.ordem ? pesos[a.tipo] - pesos[b.tipo] : a.ordem - b.ordem;
+                });
+                renderizarLicao();
+                let h = ""; licoes.forEach(l => h += `<button class="btn" style="width:40px; height:40px; padding:0; background:var(--card); font-size:10px;" onclick="prepararEdicao('${l.idDoc}')">${l.ordem}</button>`);
+                document.getElementById('lista-licoes-edit').innerHTML = h;
+            });
+        }
+
+        function renderizarLicao() {
+            const container = document.getElementById('lesson-container');
+            const l = licoes[passoAtual];
+            if(!l) { container.innerHTML = "<div class='card' style='text-align:center;'><h2>🏁 Jornada Concluída!</h2><p>Parabéns por chegar até aqui. Que Deus guie seus próximos passos na fé!</p></div>"; return; }
+
+            const player = `<div class="voice-player"><button class="btn-audio" onclick="alternarVoz()"><span id="btn-play-icon">▶️</span></button><div class="audio-wave"><div id="audio-bar" class="audio-progress"></div></div></div>`;
+
+            if(l.tipo === 'manual') {
+                container.innerHTML = desenharCardLicao(l, player, `<button class="btn btn-wire" onclick="proximo()">ENTENDI, PRÓXIMO ➔</button>`);
+                return;
+            }
+
+            db.collection("respostas").doc(`${alunoNome}_${l.ordem}`).onSnapshot(doc => {
+                const d = doc.data();
+                if(d) {
+                    let f = `<div style="color:var(--gold); padding-top:10px;"><b>Registrado:</b> ${d.resposta}</div>`;
+                    if(d.correcao) f += `<div class="box-info" style="border-color:var(--admin);"><b>Mestre:</b> ${d.correcao}</div>`;
+                    container.innerHTML = desenharCardLicao(l, player, f + `<button class="btn btn-wire" onclick="proximo()">PRÓXIMO ➔</button>`);
+                } else {
+                    let footer = "";
+                    if(l.tipo === 'batismo') {
+                        footer = `<div class="radio-group" style="margin-top:15px; background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                            <p style="margin: 0 0 15px 0; color: var(--gold); font-size: 0.9rem;">Selecione sua situação atual:</p>
+                            <label><input type="radio" name="opt-batismo" value="Sou Batizado"> Sou Batizado</label>
+                            <label><input type="radio" name="opt-batismo" value="Não sou Batizado"> Não sou Batizado</label>
+                            <label><input type="radio" name="opt-batismo" value="Quero entender o Batismo"> Quero entender o Batismo</label>
+                            <button class="btn btn-wire" style="margin-top: 20px;" onclick="confirmarBatismo(${l.ordem})">CONFIRMAR ESCOLHA ➔</button></div>`;
+                    }
+                    else if(l.tipo === 'salvacao') {
+                        footer = `<div class="box-oracao">"Senhor Jesus, eu entendo que Tu és o descendente prometido. Eu me arrependo dos meus pecados e te recebo como meu Salvador. Amém!"</div>
+                            <label style="display:flex; gap:10px; color:var(--gold); align-items:center; margin: 15px 0; cursor:pointer;"><input type="checkbox" id="check-decisao" style="width:18px; height:18px;"> EU FIZ A ORAÇÃO E ACEITO JESUS!</label>
+                            <button class="btn btn-wire" onclick="confirmarDecisao(${l.ordem})">CONCLUIR PASSO ➔</button>`;
+                    } else {
+                        footer = `<textarea id="t-resp" placeholder="Escreva sua resposta com sinceridade..."></textarea><button class="btn btn-wire" onclick="enviarResposta(${l.ordem})">ENVIAR RESPOSTA</button>`;
+                    }
+                    container.innerHTML = desenharCardLicao(l, player, footer);
+                }
+            });
+        }
+
+        function desenharCardLicao(l, p, f) {
+            return `<div class="card">${p}<small style="opacity:0.5; text-transform:uppercase; letter-spacing:1px;">PASSO ${l.ordem}</small><h2 style="margin-top:5px;">${l.tit}</h2>` + (l.ver ? `<span class="versiculo">${l.ver}</span>` : '') + `<div class="box-info"><div>${l.txt}</div></div>` + (l.ver2 ? `<span class="versiculo">${l.ver2}</span>` : '') + (l.explica2 ? `<div class="box-info"><div>${l.explica2}</div></div>` : '') + f + `</div>`;
+        }
+
+        function proximo() { stopVoz(); passoAtual++; renderizarLicao(); }
+
+        // --- FUNÇÕES DE ENVIO ---
+        async function enviarResposta(ordem) {
+            const r = document.getElementById('t-resp').value.trim();
+            if(!r) return alert("Por favor, escreva sua resposta antes de enviar.");
+            await db.collection("respostas").doc(`${alunoNome}_${ordem}`).set({ aluno: alunoNome, whats: localStorage.getItem("CV_WHATS"), licaoId: ordem, resposta: r, data: new Date() });
+        }
+
+        async function confirmarBatismo(ordemAtual) {
+    const sel = document.querySelector('input[name="opt-batismo"]:checked');
+    if(!sel) return alert("Por favor, selecione uma das opções.");
+
+    const escolha = sel.value;
+
+    // 1. Salva a escolha do aluno no Firebase
+    await db.collection("respostas").doc(`${alunoNome}_${ordemAtual}`).set({ 
+        aluno: alunoNome, 
+        whats: localStorage.getItem("CV_WHATS"), 
+        licaoId: ordemAtual, 
+        resposta: escolha, 
+        data: new Date() 
+    });
+
+    // 2. Lógica de Desvio (Pulo)
+    if (escolha === "Quero entender o Batismo" || escolha === "Quero Batizar") {
+        // Procure no seu Firebase qual a ORDEM da lição "O que é o Batismo"
+        // Vamos supor que seja a ordem 10. O código abaixo pula pra ela.
+        const licaoEstudo = licoes.findIndex(l => l.ordem === 10); 
+        
+        if (licaoEstudo !== -1) {
+            passoAtual = licaoEstudo;
+        } else {
+            passoAtual++; // Se não achar a lição 10, segue o fluxo normal
+        }
+    } else {
+        // Se já for batizado, segue para a próxima lição na sequência
+        passoAtual++;
+    }
+
+    stopVoz();
+    renderizarLicao();
+}
+
+        async function confirmarDecisao(ordem) {
+            if(!document.getElementById('check-decisao').checked) return alert("Por favor, marque o checkbox para confirmar sua oração.");
+            await db.collection("respostas").doc(`${alunoNome}_${ordem}`).set({ aluno: alunoNome, whats: localStorage.getItem("CV_WHATS"), licaoId: ordem, resposta: "ACEITOU JESUS!", data: new Date() });
+        }
+
+        // --- ACESSO E LOGIN ---
+        function fazerLogin() {
+            const n = document.getElementById('reg-nome').value.trim().toUpperCase();
+            const w = document.getElementById('reg-whats').value.replace(/\D/g, '');
+            if(!n || w.length < 11) return alert("Informe seu Nome Completo e WhatsApp válido com DDD.");
+            localStorage.setItem("CV_NOME", n); localStorage.setItem("CV_WHATS", w);
+            alunoNome = n; entrarApp();
+        }
+
+        function entrarApp() { document.getElementById('welcome-screen').style.display='none'; document.getElementById('main-nav').style.display='flex'; switchTab('view-discipulo'); carregarLicoes(); }
+
+        async function acessoMestre() {
+            if(prompt("Senha de Acesso:") === "1234") {
+                switchTab('view-admin');
+                
+                // RELATÓRIO DASHBOARD
+                db.collection("respostas").onSnapshot(snap => {
+                    let totalAlunos = new Set();
+                    let decisoes = 0;
+                    let batismo = { sim: 0, nao: 0, quer: 0 };
+                    let htmlRespostas = "";
+
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        totalAlunos.add(d.aluno);
+                        if(d.resposta === "ACEITOU JESUS!") decisoes++;
+                        if(d.resposta === "Sou Batizado") batismo.sim++;
+                        if(d.resposta === "Não sou Batizado") batismo.nao++;
+                        if(d.resposta === "Quero entender o Batismo") batismo.quer++;
+
+                        htmlRespostas += `<div class="card" style="border-left-color: rgba(255,255,255,0.1);"><b style="color:var(--wire);">${d.aluno}</b> <small style="opacity:0.6;">(${d.whats || 'Sem Whats'})</small><p style="margin: 10px 0;">${d.resposta}</p><textarea placeholder="Escrever correção ou feedback..." style="background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.05);" onchange="db.collection('respostas').doc('${doc.id}').update({correcao: this.value})">${d.correcao || ""}</textarea></div>`;
+                    });
+
+                    document.getElementById('stat-alunos').innerText = totalAlunos.size;
+                    document.getElementById('stat-decisoes').innerText = decisoes;
+                    document.getElementById('stat-batismo').innerHTML = `<span>✅ ${batismo.sim} Batizados</span> <span>❌ ${batismo.nao} Não</span> <span>📖 ${batismo.quer} Querem</span>`;
+                    document.getElementById('lista-respostas-admin').innerHTML = htmlRespostas;
+                });
+            }
+        }
+
+        // --- GESTÃO DE LIÇÕES ---
+        async function salvarLicaoCloud() {
+            const id = document.getElementById('edit-id-doc').value;
+            const dados = { ordem: parseInt(document.getElementById('new-ordem').value), tit: document.getElementById('new-tit').value, txt: document.getElementById('new-txt').value || "", ver: document.getElementById('new-ver').value || "", ver2: document.getElementById('new-ver2').value || "", explica2: document.getElementById('new-exp2').value || "", tipo: document.getElementById('new-tipo').value };
+            if(!dados.ordem || !dados.tit) return alert("Ordem e Título são obrigatórios.");
+            if(id) await db.collection("config_licoes").doc(id).set(dados, {merge:true});
+            else await db.collection("config_licoes").add(dados);
+            alert("Lição salva com sucesso!"); limparForm();
+        }
+
+        function prepararEdicao(id) {
+            const l = licoes.find(x => x.idDoc === id);
+            document.getElementById('edit-id-doc').value = id;
+            document.getElementById('new-ordem').value = l.ordem;
+            document.getElementById('new-tit').value = l.tit;
+            document.getElementById('new-txt').value = l.txt;
+            document.getElementById('new-ver').value = l.ver;
+            document.getElementById('new-ver2').value = l.ver2 || "";
+            document.getElementById('new-exp2').value = l.explica2 || "";
+            document.getElementById('new-tipo').value = l.tipo;
+            document.getElementById('btn-save-main').innerHTML = "ATUALIZAR LIÇÃO";
+            document.getElementById('btn-cancel').style.display = "block";
+            window.scrollTo(0,0);
+        }
+
+        function limparForm() { document.getElementById('edit-id-doc').value = ""; document.getElementById('btn-save-main').innerHTML = "SALVAR LIÇÃO"; document.getElementById('btn-cancel').style.display = "none"; document.getElementById('new-ordem').value = ""; document.getElementById('new-tit').value = ""; document.getElementById('new-txt').value = ""; }
+        function switchTab(t) { document.querySelectorAll('.container').forEach(c => c.classList.remove('active')); document.getElementById(t).classList.add('active'); }
+        
+        // Timer da Splash Screen
+        window.onload = () => { 
+            setTimeout(() => { 
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.visibility = 'hidden';
+                    if(alunoNome) entrarApp(); else document.getElementById('welcome-screen').style.display='flex';
+                }, 800);
+            }, 3000); 
+        };
+
+// --- SISTEMA DE SEGURANÇA (BLOQUEIO DE INSPEÇÃO) ---
+document.addEventListener('keydown', function(e) {
+    // Bloqueia F12
+    if (e.keyCode == 123) {
+        e.preventDefault();
+        return false;
+    }
+    // Bloqueia Ctrl+Shift+I (Inspeção)
+    if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
+        e.preventDefault();
+        return false;
+    }
+    // Bloqueia Ctrl+Shift+J (Console)
+    if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+        e.preventDefault();
+        return false;
+    }
+    // Bloqueia Ctrl+U (Ver Código Fonte)
+    if (e.ctrlKey && e.keyCode == 85) {
+        e.preventDefault();
+        return false;
+    }
+}, false);
+
+// Bloqueia o Botão Direito do Mouse
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+}, false);
+
+// REGISTRO DO SERVICE WORKER PARA INSTALAÇÃO
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+// LINK DO MANIFEST (Coloque isso dentro da tag <head> do seu HTML)
+// <link rel="manifest" href="manifest.json">
+    </script>
+</body>
+</html>
