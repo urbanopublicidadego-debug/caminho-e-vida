@@ -140,6 +140,11 @@
         }
     </style>
 </head>
+    <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
 <body oncontextmenu="return false;">
 
     <div id="splash-screen">
